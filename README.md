@@ -19,7 +19,7 @@ LEFT and RIGHT are from the wearer's point of view.
 - **The ear slides onto the clip** on a dovetail rail (0.15 mm side clearance, 0.25 mm top), so the two materials don't have to print together.
 
 ## Print settings (Bambu printer)
-- **Ears (PLA Matte):** 0.16 mm layers (0.12 mm for even finer side walls), 3 walls, 15% infill, no supports, no brim needed.
+- **Ears (PLA Matte):** for speed, 0.20 mm layers, 2 walls, 10% infill (use 0.16 mm and 3 walls for a finer finish), no supports, no brim needed.
 - **Clips (PETG Basic):** 0.20 mm layers, **4 walls**, 100% infill (they're small, and solid is strongest), no supports. Use a **brim** because it's tall and narrow (62 mm).
 - **Inner ears (PLA Matte):** 0.16 mm, flat, no supports.
 - **Filament used, both ears:** about 66 g Charcoal, 28 g black PETG and 10 g Sakura Pink.
@@ -29,16 +29,20 @@ LEFT and RIGHT are from the wearer's point of view.
 2. Slide each ear onto a clip's dovetail rail from one end until it's centred. A small drop of superglue or epoxy on the rail makes it permanent. Optional, but recommended.
 3. Hold the ear over the headband about 50 mm out from the centre of the "CORSAIR" logo and press straight down until both hooks click under the band's edges. To remove it, flex one clip wall outward.
 
-## Cheap, fast filament (Ireland / EU)
-Any brand works on a Bambu printer (use the Generic PLA / Generic PETG profile). One order from **3DJake Ireland** covers everything, with about 4 days' delivery:
+## Cheapest verified filament (Amazon.ie, checked 17 Nov 2026)
+All 1.75 mm, so they work in any Bambu printer (Generic PLA / Generic PETG profile). Each plate uses **one filament only**, so there are no colour swaps and no purge waste, and the AMS isn't needed.
 
-| For | Material | Example (3djake.ie) | Approx. price |
-|---|---|---|---|
-| Ears | Matte black PLA | [Elegoo PLA Matte Black](https://www.3djake.ie/elegoo/pla-matte-matte-black) | €18.49 / kg |
-| Clips | Black PETG (not matte) | [SUNLU PETG Black](https://www.3djake.ie/sunlu/petg-black-10) | €14.39 / kg |
-| Inner ears | Pink PLA | [Elegoo PLA Pink](https://www.3djake.ie/elegoo/pla-pink-9) | €13.39 / kg |
+| Plate | Prints | Filament | Link | Price |
+|---|---|---|---|---|
+| 1 | 2 ears | Matte black PLA | [DEEPLEE Matte PLA Black 1 kg](https://www.amazon.ie/dp/B0DKNPTNDD) | €15.83 |
+| 2 | 2 clips | Black PETG | [CC3D Standard PETG Black 1 kg](https://www.amazon.ie/dp/B0D91G7BDF) | €12.99 |
+| 3 | 2 inner ears | Pink PETG (fine here, it doesn't flex) | [CC3D Standard PETG Pink 1 kg](https://www.amazon.ie/dp/B0F6N6JR5K) | €12.99 |
 
-That's about €46 plus roughly €9.90 delivery (free over €87.90). Check the live pages: prices and stock change.
+About €42 in total. **Cheapest possible (€25.98):** skip the matte PLA and print the ears in the same black PETG as the clips. Two rolls, but glossier ears.
+
+**Filament actually used:** about 40–55 g of black PLA, 25 g of black PETG (37 g if you print one test clip first) and 5 g of pink.
+
+Avoid: a €10.76 "CC3D PETG Pink" listing (ASIN B0FFH3984F) whose spec sheet says TPE, and a "Creality PETG" listing (B0C8NP63GD) whose brand field says YOOPAI.
 
 ## Filament notes
 - **PETG HF is being discontinued** in most colours. Bambu relaunched **PETG Basic** in 2026 as the successor, and it's what the clips use. Avoid *matte* PETG for the clips: the matte additive makes it stiffer and more brittle, which is the opposite of what a snap clip wants.
