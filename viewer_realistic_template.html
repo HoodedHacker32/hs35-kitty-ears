@@ -33,8 +33,9 @@
   <h1>Cat ears on the Corsair HS35 v2</h1>
   <div class="sub">Drag to orbit, scroll to zoom right in, right-drag to pan.</div>
   <div class="body">
-    <div class="mat"><i class="sw" style="background:#0d0d0f"></i><b>Ears: Bambu Lab PETG HF, Black</b><span>Printed upright on a Bambu printer. The layer lines are drawn from the real print orientation.</span></div>
-    <div class="mat"><i class="sw" id="insSw" style="background:#e9b3c6"></i><b id="insName">Inner ear: Bambu PLA Matte, Sakura Pink</b><span>Printed flat; the front face shows top-surface lines.</span></div>
+    <div class="mat"><i class="sw" style="background:#26262a"></i><b>Ears: Bambu PLA Matte, Charcoal</b><span>Printed lying on their flat back, with no supports. The layer lines come from that orientation.</span></div>
+    <div class="mat"><i class="sw" style="background:#0b0b0c"></i><b>Clips: Bambu PETG Basic, Black</b><span>Printed standing on end, so the snap hooks flex along the layers, not across them.</span></div>
+    <div class="mat"><i class="sw" id="insSw" style="background:#e9b3c6"></i><b id="insName">Inner ear: Bambu PLA Matte, Sakura Pink</b><span>Printed flat. Presses into the ear.</span></div>
     <div class="mat"><i class="sw" style="background:#1a1a1d"></i><b>Headset: HS35 v2</b><span>Real headband and strap-anchor geometry; cups, pads, strap, mic and cable modelled from Corsair's product photos.</span></div>
     <div class="lbl">Layer height</div>
     <div class="row" id="lh"><button data-v="0.08">0.08 mm</button><button data-v="0.12">0.12 mm</button><button data-v="0.16" aria-pressed="true">0.16 mm</button><button data-v="0.20">0.20 mm</button></div>
@@ -232,12 +233,13 @@ M.band = new THREE.MeshPhysicalMaterial({ color: 0x0d0d0f, roughness: 0.26, norm
 M.band.normalMap = T.grainN.clone(); M.band.normalMap.repeat.set(1 / 6, 1 / 6); M.band.normalMap.needsUpdate = true;
 M.anchor = new THREE.MeshPhysicalMaterial({ color: 0x121214, roughness: 0.7 });
 M.shell = new THREE.MeshPhysicalMaterial({ color: 0x141416, roughness: 0.56, clearcoat: 0.08, clearcoatRoughness: 0.5 });
-M.bezel = new THREE.MeshPhysicalMaterial({ color: 0x2b2c30, metalness: 0.65, roughness: 0.12, clearcoat: 1, clearcoatRoughness: 0.04 });
+M.bezel = new THREE.MeshPhysicalMaterial({ color: 0x8a8d93, metalness: 1.0, roughness: 0.07, clearcoat: 1, clearcoatRoughness: 0.03, side: THREE.DoubleSide });   // chrome-like ring, as on the real cup
 M.trim = new THREE.MeshPhysicalMaterial({ color: 0x1e1f23, roughness: 0.3, metalness: 0.2 });
 M.recess = new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.9 });
+M.logo = new THREE.MeshPhysicalMaterial({ color: 0x101012, metalness: 0.7, roughness: 0.12, clearcoat: 1, clearcoatRoughness: 0.03, transparent: true, polygonOffset: true, polygonOffsetFactor: -4 });
 M.gloss = new THREE.MeshPhysicalMaterial({ color: 0x060607, roughness: 0.12, clearcoat: 1, clearcoatRoughness: 0.05 });
 M.disc = new THREE.MeshPhysicalMaterial({ color: 0x3c3d42, metalness: 0.25, roughness: 0.45, normalMap: T.triN, normalScale: new THREE.Vector2(2.2, 2.2) });
-M.disc.normalMap.repeat.set(55 / 10, 55 / 10);
+M.disc.normalMap.repeat.set(55 / 7, 55 / 7);
 M.print = new THREE.MeshStandardMaterial({ color: 0xaeb1b6, roughness: 0.55, transparent: true, polygonOffset: true, polygonOffsetFactor: -4 });
 M.pad = new THREE.MeshPhysicalMaterial({ color: 0x1f1f23, roughness: 1.0, specularIntensity: 0.15, sheen: 1, sheenColor: new THREE.Color(0x5c5c66), sheenRoughness: 0.7, normalMap: T.padN, normalScale: new THREE.Vector2(1.7, 1.7) });
 M.strap = new THREE.MeshPhysicalMaterial({ color: 0x232328, roughness: 0.88, sheen: 1, sheenColor: new THREE.Color(0x5a5a66), sheenRoughness: 0.45, normalMap: T.strapN, normalScale: new THREE.Vector2(1.5, 1.5) });
@@ -261,10 +263,10 @@ function printedMaterial(opts, mode) {
   m.onBeforeCompile = (sh) => {
     sh.uniforms.uLayer = PRINT.layer;
     sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vPrintPos; varying vec3 vPrintZ; varying vec3 vPrintX;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvPrintPos = position;\nvPrintZ = normalize((viewMatrix * modelMatrix * vec4(0.,0.,1.,0.)).xyz);\nvPrintX = normalize((viewMatrix * modelMatrix * vec4(1.,0.,1.,0.)).xyz);');
+      .replace('#include <common>', '#include <common>\nvarying vec3 vPrintPos; varying vec3 vPrintZ; varying vec3 vPrintX; varying vec3 vPrintD;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvPrintPos = position;\nvPrintZ = normalize((viewMatrix * modelMatrix * vec4(0.,0.,1.,0.)).xyz);\nvPrintX = normalize((viewMatrix * modelMatrix * vec4(1.,0.,1.,0.)).xyz);\nvPrintD = normalize((viewMatrix * modelMatrix * vec4(0.7071,0.7071,0.,0.)).xyz);');
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform float uLayer; varying vec3 vPrintPos; varying vec3 vPrintZ; varying vec3 vPrintX;')
+      .replace('#include <common>', '#include <common>\nuniform float uLayer; varying vec3 vPrintPos; varying vec3 vPrintZ; varying vec3 vPrintX; varying vec3 vPrintD;')
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
       {
         ${mode === 'walls' ? `
@@ -281,6 +283,11 @@ function printedMaterial(opts, mode) {
         // tiny layer-to-layer extrusion variation (z-wobble)
         float wob = fract(sin(floor(vPrintPos.z / uLayer) * 91.7) * 4375.85);
         roughnessFactor = clamp(roughnessFactor + (wob - 0.5) * 0.06 + 0.05 * cos(ph) * amp, 0.04, 1.0);
+        // top / bottom skins: monotonic 45-degree extrusion lines (0.42 mm) where the surface faces along print Z
+        float ph2 = dot(vPrintPos.xy, vec2(0.7071)) / 0.42 * 6.2831853;
+        float amp2 = 0.25 * clamp(1.0 - fwidth(ph2) / 2.6, 0.0, 1.0) * (1.0 - smoothstep(0.15, 0.45, side));
+        vec3 dd = vPrintD - normal * dot(vPrintD, normal);
+        if (length(dd) > 1e-3) normal = normalize(normal + normalize(dd) * sin(ph2) * amp2);
         ` : `
         // flat-printed part: top-surface lines at 45 degrees, 0.42 mm line width
         float ph = dot(vPrintPos, normalize(vec3(1.0, 0.0, 1.0))) / 0.42 * 6.2831853;
@@ -297,8 +304,9 @@ function printedMaterial(opts, mode) {
   return m;
 }
 M.petg = printedMaterial({ color: 0x0b0b0c, roughness: 0.3, specularIntensity: 0.75, clearcoat: 0.12, clearcoatRoughness: 0.3, sheen: 0 }, 'walls');
+M.earPLA = printedMaterial({ color: 0x232327, roughness: 0.82, specularIntensity: 0.4 }, 'walls');
 M.pla = printedMaterial({ color: new THREE.Color('#e9b3c6'), roughness: 0.82, specularIntensity: 0.35 }, 'top');
-M.petg.envMapIntensity = ENV.petg; M.pla.envMapIntensity = 0.55;
+M.petg.envMapIntensity = ENV.petg; M.earPLA.envMapIntensity = 0.6; M.pla.envMapIntensity = 0.55;
 
 // ------------------------------------------------------------------ helpers
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -306,7 +314,10 @@ function mesh(g, m, parent = world) { const o = new THREE.Mesh(g, m); o.castShad
 function lathe(profile, seg = 160) { return new THREE.LatheGeometry(profile.map(([r, h]) => new THREE.Vector2(r, h)), seg); }
 function roundRect(w, h, r) { const s = new THREE.Shape(); s.moveTo(-w / 2 + r, -h / 2); s.lineTo(w / 2 - r, -h / 2); s.quadraticCurveTo(w / 2, -h / 2, w / 2, -h / 2 + r); s.lineTo(w / 2, h / 2 - r); s.quadraticCurveTo(w / 2, h / 2, w / 2 - r, h / 2); s.lineTo(-w / 2 + r, h / 2); s.quadraticCurveTo(-w / 2, h / 2, -w / 2, h / 2 - r); s.lineTo(-w / 2, -h / 2 + r); s.quadraticCurveTo(-w / 2, -h / 2, -w / 2 + r, -h / 2); return s; }
 function basis(o, u, v, n) { o.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(u, v, n)); return o; }
-function decal(canvasEl, w, h, mat = M.print) { const m = mat.clone(); m.map = tex(canvasEl); m.map.wrapS = m.map.wrapT = THREE.ClampToEdgeWrapping; m.alphaTest = 0.05; return new THREE.Mesh(new THREE.PlaneGeometry(w, h), m); }
+function decal(canvasEl, w, h, mat = M.print) {
+  const m = mat.clone(), tx = tex(canvasEl, mat === M.print); tx.wrapS = tx.wrapT = THREE.ClampToEdgeWrapping;
+  if (mat === M.print) m.map = tx; else m.alphaMap = tx;   // glossy decals use the artwork as an alpha mask
+  m.alphaTest = 0.05; return new THREE.Mesh(new THREE.PlaneGeometry(w, h), m); }
 
 // ------------------------------------------------------------------ earcup details (shells and pads are sculpted meshes from the GLB)
 const CUP = META.cup, DISC = META.disc;
@@ -314,17 +325,13 @@ function buildSide(s) {
   const g = new THREE.Group(); g.position.set(s * CUP.x, 0, CUP.z); g.scale.x = s; world.add(g);
   // textured disc sitting in its recess, with the printed sails logo
   const disc = mesh(new THREE.CircleGeometry(DISC.r - 0.35, 180), M.disc, g); basis(disc, V(0, 1, 0), V(0, 0, 1), V(1, 0, 0)); disc.position.set(META.disc_floor_x + 0.05, DISC.y, DISC.z);
-  const [lc, lx] = canvas2d(1024); drawLogo(lx, 1024, '#c3c6cb');
-  const logo = decal(lc, 17, 17); basis(logo, V(0, 1, 0), V(0, 0, 1), V(1, 0, 0)); logo.position.set(META.disc_floor_x + 0.09, DISC.y - 9, DISC.z + 0.5); if (s < 0) logo.scale.x = -1; g.add(logo);
+  const [lc, lx] = canvas2d(1024); drawLogo(lx, 1024, '#ffffff');
+  const logo = decal(lc, 16, 16, M.logo); basis(logo, V(0, 1, 0), V(0, 0, 1), V(1, 0, 0)); logo.position.set(META.disc_floor_x + 0.09, DISC.y + 1, DISC.z + 1.5); if (s < 0) logo.scale.x = -1; g.add(logo);
   // glossy sloped bezel lining the dish around the disc (catches light almost like chrome on the real cup)
   { const B = META.bezel, pts = [];
-    for (let i = 0; i <= 12; i++) { const x = B.x0 + (B.x1 - B.x0) * i / 12; pts.push(new THREE.Vector2(B.r0 + (x - B.x0) * B.slope + 0.04, x)); }
+    for (let i = 0; i <= 12; i++) { const x = B.x0 + (B.x1 - B.x0) * i / 12; pts.push(new THREE.Vector2(B.r0 + (x - B.x0) * B.slope + 0.25, x + 0.12)); }
     const bg = new THREE.LatheGeometry(pts, 180); bg.rotateZ(-Math.PI / 2);
     const bez = mesh(bg, M.bezel, g); bez.position.set(0, DISC.y, DISC.z); }
-  // "// HS35" printed along the recessed front panel
-  { const P = META.pill, [hc, hx] = canvas2d(512, 96); hx.fillStyle = '#9fa3a9'; hx.font = '500 58px "Segoe UI", Arial'; hx.textAlign = 'center'; hx.textBaseline = 'middle'; hx.letterSpacing = '14px'; hx.fillText('// HS35', 263, 50);
-    const hs = decal(hc, 15, 2.8); const c = Math.cos(P.ang), sn = Math.sin(P.ang);
-    basis(hs, V(0, sn, -c), V(0, c, sn), V(1, 0, 0)); hs.position.set(P.x + 0.04, P.y, P.z); if (s < 0) hs.scale.x = -1; g.add(hs); }
   // speaker cloth inside the pad
   const cm = M.pad.clone(); cm.normalMap = T.padN.clone(); cm.normalMap.repeat.set(9, 13); cm.normalMap.needsUpdate = true; cm.side = THREE.DoubleSide; cm.color.set(0x0c0c0d);
   const cloth = mesh(new THREE.CircleGeometry(1, 96), cm, g); cloth.rotation.y = -Math.PI / 2; cloth.scale.set(21, 31, 1); cloth.position.x = -2;
@@ -403,8 +410,8 @@ new GLTFLoader().parse(bytes.buffer, '', (gl) => {
   for (const o of list) {
     const name = o.name || o.parent.name;
     let geo = o.geometry; geo.deleteAttribute('normal');
-    geo = (name.startsWith('cup') || name.startsWith('pad')) ? (geo.computeVertexNormals(), geo) : toCreasedNormals(geo, name.startsWith('ear') ? Math.PI / 5 : Math.PI / 7);
-    const mat = name.startsWith('ear') ? M.petg : name.startsWith('insert') ? M.pla : name.startsWith('anchor') ? M.anchor
+    geo = (name.startsWith('cup') || name.startsWith('pad')) ? (geo.computeVertexNormals(), geo) : toCreasedNormals(geo, (name.startsWith('ear') || name.startsWith('clip')) ? Math.PI / 5 : Math.PI / 7);
+    const mat = name.startsWith('ear') ? M.earPLA : name.startsWith('clip') ? M.petg : name.startsWith('insert') ? M.pla : name.startsWith('anchor') ? M.anchor
       : name.startsWith('cup') ? M.shell : name.startsWith('pad') ? M.padSculpt : M.band;
     o.updateWorldMatrix(true, false);
     const m = new THREE.Mesh(geo, mat); m.castShadow = m.receiveShadow = true;
@@ -481,7 +488,7 @@ renderer.setAnimationLoop((now) => {
   if (useAO) composer.render(); else renderer.render(scene, cam);
 });
 window.__ready = () => !document.getElementById('loading');
-window.__look = (p, q) => { anim = null; cam.position.copy(W2V(...p)); ctl.target.copy(W2V(...q)); ctl.update(); };
+window.__look = (p, q) => { anim = null; cam.position.copy(W2V(...p)); ctl.target.copy(W2V(...q)); ctl.update(); cam.near = 0.5; cam.updateProjectionMatrix(); (useAO ? composer : renderer).render(scene, cam); if (useAO) composer.render(); };
 </script>
 </body>
 </html>

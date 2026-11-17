@@ -1,10 +1,13 @@
 """
-Puffy "hood" style snap-on cat ears for the Corsair HS35 v2 / HS35 Surround v2.
-(Style inspired by soft, rounded-triangle cat ears with a thick rim and a deep inner ear.)
+v3: SPLIT, SUPPORT-FREE cat ears for the Corsair HS35 v2 / HS35 Surround v2.
 
-Run:  python cat_ears_v2.py [--band-stl corsair_hs_35_v2_headband.stl] [--place 50]
+Per side: 1 ear (prints flat on its back, no supports), 1 clip (prints standing on its end so the
+snap hooks flex ALONG the layer lines), 1 inner-ear insert (prints flat). The ear slides onto a
+dovetail rail on the clip (a drop of glue optional).
+
+Run:  python cat_ears_v3.py [--band-stl corsair_hs_35_v2_headband.stl] [--place 50]
 Defaults are measured from the HS35 v2 headband model (35.6 mm wide, 7.5 mm edge, 91.5 mm arch radius).
-Outputs STLs + a preview .glb into ./out_v2/
+Outputs print-oriented STLs + an as-worn preview .glb + placement.json into ./out_v3/
 
 Axes (as worn): X along the headband, Y across it (- = front/face side), Z up.
 The wearer faces -Y, so +X is the WEARER'S LEFT. The ear modelled at +X is exported as the LEFT ear.
@@ -24,7 +27,7 @@ ap.add_argument("--thick", type=float, default=7.5, help="headband edge depth: t
 ap.add_argument("--radius", type=float, default=91.5, help="headband arch radius where the ear sits (mm)")
 ap.add_argument("--height", type=float, default=72.0, help="ear height above the clip (mm)")
 ap.add_argument("--res", type=float, default=0.45, help="sculpt resolution (mm), smaller = smoother/slower")
-ap.add_argument("--out", default="out_v2")
+ap.add_argument("--out", default="out_v3")
 ap.add_argument("--band-stl", default=None, help="headband STL for the preview + collision check")
 ap.add_argument("--place", type=float, default=50.0, help="ear centre distance from the top-centre of the arch, along the band (mm)")
 A = ap.parse_args()
@@ -91,7 +94,7 @@ def smax(a, b, k):
 r = A.res
 xs = np.arange(-HW - 14, HW + 14, r)
 ys = np.arange(-YO - 6, YO + 6, r)
-zs = np.arange(-6.0, H + 10, r)
+zs = np.arange(-16.0, H + 10, r)
 X2, Z2 = np.meshgrid(xs, zs, indexing="ij")
 d_prof = poly_sdf(PROF, X2, Z2)[:, None, :]           # (nx, 1, nz)
 d_in = poly_sdf(INNER, X2, Z2)[:, None, :]
@@ -99,7 +102,8 @@ X = xs[:, None, None]; Y = ys[None, :, None]; Z = zs[None, None, :]
 
 zc = np.clip(Z, 0, None)
 front = -YO + 0.20 * zc                               # front face leans back toward the tip
-back = YO - 0.19 * zc - 5.0 * (X / HW) ** 2 * np.clip(zc / 20, 0, 1)   # domed back
+ZMIN_EAR = -12.0                                      # lowest point the ear base needs to reach
+back = YO - 0.19 * (Z - ZMIN_EAR)                     # ONE flat plane: the ear prints lying on it
 d_front = front - Y                                   # >0 in front of the ear
 d_back = Y - back
 def round_inter(ds, rr):
@@ -111,11 +115,10 @@ def round_inter(ds, rr):
         mx = np.maximum(mx, d)
     return np.sqrt(pos) + np.minimum(mx, 0) - rr
 RR = KR * np.clip((Z - 2.0) / 14.0, 0.02, 1.0)        # rounding fades in above the clip (no ledge)
-body = round_inter([d_prof, d_front, d_back], RR)
-# keep the base exactly flush with the clip right at the plate (no rounding there)
-flush = np.maximum(np.maximum(d_prof, -YO - Y), Y - YO)
-base_block = np.maximum(flush, Z - 3.0)              # full-depth block right at the clip
-body = np.minimum(body, base_block)
+body = round_inter([d_prof, d_front], RR)             # soft, puffy front and sides
+CH = 2.5                                              # 45-degree chamfer around the flat back (prints without support)
+body = np.maximum(np.maximum(body, d_back), 0.574 * d_back + 0.819 * d_prof + CH * 0.7)   # 35 deg from vertical when printed
+body = np.maximum(body, -YO - Y)                      # never wider than the clip at the front
 
 # inner-ear cavity: straight walls, flat floor (so the insert can be printed flat), rounded lip at the front
 FLOOR = -3.0                                          # y of the cavity floor
@@ -172,11 +175,23 @@ def along_x(man, L):
 CLIP_L = 2 * HW - 4
 clip = along_x(clip_profile(False).extrude(CLIP_L, n_divisions=40), CLIP_L) + \
        along_x(clip_profile(True).extrude(HOOK_L, n_divisions=20), HOOK_L)
-plan = cs_from_shapely(Polygon([(-CLIP_L / 2, -YO), (CLIP_L / 2, -YO), (CLIP_L / 2, YO), (-CLIP_L / 2, YO)])
-                       .buffer(-6, join_style=1).buffer(6, join_style=1))
+# 45-degree chamfered corners (not rounded): the clip prints standing on its end, and a chamfer needs no support
+c4 = 4.0; L2 = CLIP_L / 2
+plan = cs_from_shapely(Polygon([(-L2 + c4, -YO), (L2 - c4, -YO), (L2, -YO + c4), (L2, YO - c4), (L2 - c4, YO), (-L2 + c4, YO), (-L2, YO - c4), (-L2, -YO + c4)]))
 clip = clip ^ plan.extrude(100).translate([0, 0, -50])
+# dovetail rail on top of the clip; the ear has the matching groove (0.15 mm side / 0.25 mm top clearance)
+# Asymmetric key: the +Y flank is a true dovetail undercut (it faces the bed when the ear prints, so its angle is free);
+# the -Y flank tapers in at 45 deg, so in the ear's print orientation the groove's "ceiling" is self-supporting.
+def key(gap, top, z0):
+    zz = lambda zr: PLATE + zr
+    return cs_from_shapely(Polygon([(-(5.0 - gap - z0), zz(z0)), (4.0 - gap + 0.6 * z0, zz(z0)),
+                                    (4.0 - gap + 0.6 * top, zz(top)), (-(5.0 - gap - top), zz(top))]))
+rail = along_x(key(0.15, 2.95, -0.3).extrude(CLIP_L, n_divisions=40), CLIP_L) ^ plan.extrude(100).translate([0, 0, -50])
+groove = along_x(key(0.0, 3.2, -0.02).extrude(200, n_divisions=80), 200)
+clip = clip + rail
 
-# ----------------------------------------------------------------- assemble
+
+# ----------------------------------------------------------------- assemble (clip-local frame: plate top follows the arch)
 def bend(p):
     x, y, z = p[:, 0], p[:, 1], p[:, 2]
     return np.column_stack([x, y, z + np.sqrt(np.maximum(R * R - x * x, 1)) - R])
@@ -184,54 +199,75 @@ def bend(p):
 def place_ear(m):
     return m.rotate([0, TILT, 0]).translate([0, 0, PLATE - 0.4])
 
-ear_p = place_ear(ear).trim_by_plane([0, 0, 1], 0.6)
-ear_p = ear_p ^ Manifold.cube([400, 2 * YO - 0.06, 400]).translate([-200, -YO + 0.03, -100])   # never wider than the clip at the base
-right = (clip + ear_p).refine_to_length(3.0).warp_batch(bend)
-left = right.mirror([1, 0, 0])
-ins_r = place_ear(insert_worn).refine_to_length(3.0).warp_batch(bend)
+clip_b = clip.refine_to_length(3.0).warp_batch(bend)
+below = Manifold.cube([200, 80, 80]).translate([-100, -40, PLATE - 80]).refine_to_length(3.0).warp_batch(bend)
+groove_b = groove.refine_to_length(3.0).warp_batch(bend)
+# the ear itself is NOT warped (so its back stays one flat plane); only its base is cut to the arch
+earL = place_ear(ear) - below - groove_b
+earR = earL.mirror([1, 0, 0])
+clipR = clip_b.mirror([1, 0, 0])
+ins_L = place_ear(insert_worn)        # inserts sit on the (flat) cavity floor
+ins_R = ins_L.mirror([1, 0, 0])
 
-# ----------------------------------------------------------------- export
+# ----------------------------------------------------------------- print orientations
 os.makedirs(A.out, exist_ok=True)
 def tm_of(man):
     mm = man.to_mesh()
     return trimesh.Trimesh(mm.vert_properties[:, :3], mm.tri_verts, process=True)
-ZMIN = {}
-def save(man, name):
-    t = tm_of(man); ZMIN[name] = float(t.bounds[0][2]); t.apply_translation([0, 0, -t.bounds[0][2]])
+def unit(v):
+    v = np.asarray(v, float); return v / np.linalg.norm(v)
+def ry(deg):
+    a = np.radians(deg); c, s_ = np.cos(a), np.sin(a)
+    return np.array([[c, 0, s_], [0, 1, 0], [-s_, 0, c]])
+n_back = ry(TILT) @ unit([0, 1, 0.19])     # outward normal of the ear's flat back (clip-local)
+PRINT = {}
+def save_print(man, name, down):
+    """Orient so `down` (unit vector in the part frame) points at the bed; record the print->part matrix."""
+    t = tm_of(man)
+    Rm = trimesh.geometry.align_vectors(unit(down), [0, 0, -1])
+    t.apply_transform(Rm)
+    c = t.bounds.mean(0); sh = np.array([-c[0], -c[1], -t.bounds[0][2]])
+    t.apply_translation(sh)
+    Mprint = trimesh.transformations.translation_matrix(sh) @ Rm
+    PRINT[name] = np.linalg.inv(Mprint).tolist()
     t.export(os.path.join(A.out, name))
-    print(f"{name:34s} tris={len(t.faces):7d} watertight={t.is_watertight} size={np.round(t.extents, 1)}")
+    print(f"{name:30s} tris={len(t.faces):7d} watertight={t.is_watertight} size={np.round(t.extents, 1)}")
 
 tag = f"W{W:g}_T{T:g}"
-# `right` is built at +X = the wearer's LEFT side
-save(right, f"cat_ear_LEFT_{tag}.stl")
-save(left, f"cat_ear_RIGHT_{tag}.stl")
-save(insert_flat, "inner_ear_insert_LEFT.stl")
-save(insert_flat.mirror([1, 0, 0]), "inner_ear_insert_RIGHT.stl")
+# +X is the wearer's LEFT
+save_print(earL, "ear_LEFT.stl", n_back)
+save_print(earR, "ear_RIGHT.stl", n_back * np.array([-1, 1, 1]))
+CLIP_NAME = f"clip_{tag}_print_x2.stl"
+save_print(clip_b, CLIP_NAME, [-1, 0, 0])            # stands on its end: every layer is the full clip profile
+save_print(insert_flat, "inner_ear_insert_LEFT.stl", [0, 0, -1])
+save_print(insert_flat.mirror([1, 0, 0]), "inner_ear_insert_RIGHT.stl", [0, 0, -1])
+
+def overhang_report(name):
+    t = trimesh.load(os.path.join(A.out, name))
+    nz = t.face_normals[:, 2]; cz = t.triangles_center[:, 2]
+    bad = (nz < -np.cos(np.radians(45)) - 1e-3) & (cz > 0.4)
+    print(f"  {name}: downward area steeper than 45 deg (not on the bed): {t.area_faces[bad].sum():.1f} mm^2 of {t.area:.0f} mm^2")
+for n in ("ear_LEFT.stl", CLIP_NAME, "inner_ear_insert_LEFT.stl"):
+    overhang_report(n)
 
 # ----------------------------------------------------------------- preview (+ collision check on the real band)
 def to_mani(tmesh):
     return Manifold(m3.Mesh(vert_properties=np.asarray(tmesh.vertices, np.float32), tri_verts=np.asarray(tmesh.faces, np.uint32)))
-
 if A.band_stl:
     bt = trimesh.load(A.band_stl)
-    # STL frame: arch in XY (apex toward +X), width along Z. Fit arch centre, map to ours:
     sec = bt.section(plane_origin=[0, 0, bt.bounds[1][2] / 2], plane_normal=[0, 0, 1])
     P = np.vstack(sec.discrete)[:, :2]
-    cy = P[np.argmax(P[:, 0]), 1]
-    apex = bt.bounds[1][0]
-    v = bt.vertices
+    cy = P[np.argmax(P[:, 0]), 1]; apex = bt.bounds[1][0]; v = bt.vertices
     bt = trimesh.Trimesh(np.column_stack([v[:, 1] - cy, v[:, 2] - bt.bounds[1][2] / 2, v[:, 0] - apex]), bt.faces, process=True)
     band = to_mani(bt)
-    # top-surface curve along the middle of the band
     sec = bt.section(plane_origin=[0, 0, 0], plane_normal=[0, 1, 0])
     dense = []
-    for e in sec.discrete:   # resample every path at 0.2 mm so no angle bin is left with only inner-surface points
+    for e in sec.discrete:
         e = e[:, [0, 2]]
         for a, b in zip(e[:-1], e[1:]):
             n = max(2, int(np.hypot(*(b - a)) / 0.2))
             dense.append(a + (b - a) * np.linspace(0, 1, n, endpoint=False)[:, None])
     Q = np.vstack(dense)
-    # outer contour ordered by angle around a point well inside the arch (max radius per angle bin)
     C0 = np.array([0.0, -80.0])
     ang = np.arctan2(Q[:, 0] - C0[0], Q[:, 1] - C0[1]); rad = np.hypot(Q[:, 0] - C0[0], Q[:, 1] - C0[1])
     edges = np.linspace(-1.3, 1.3, 400); pts = []
@@ -241,40 +277,42 @@ if A.band_stl:
             k = np.argmax(np.where(sel, rad, -1)); pts.append(Q[k])
     pts = np.array(pts)
     rr = np.hypot(pts[:, 0] - C0[0], pts[:, 1] - C0[1])
-    pts = pts[rr > np.percentile(rr, 30) - 4]                      # drop stray inner points
+    pts = pts[rr > np.percentile(rr, 30) - 4]
     xs_, top = pts[:, 0], pts[:, 1]
-    seg = np.hypot(np.diff(xs_), np.diff(top)); sarc = np.concatenate([[0], np.cumsum(seg)])
+    sarc = np.concatenate([[0], np.cumsum(np.hypot(np.diff(xs_), np.diff(top)))])
     s0 = np.interp(0, xs_, sarc)
-    PLACEMENT = {}
-    SEAT = 0.15   # plate rests on the band top; tiny lift so the check measures real clashes, not contact
-    def place(man, side):
+    SEAT = 0.15
+    def place_matrix(side):
         s = s0 + side * A.place
         x = np.interp(s, sarc, xs_); z = np.interp(s, sarc, top)
         dx = np.interp(s + 1, sarc, xs_) - np.interp(s - 1, sarc, xs_)
         dz = np.interp(s + 1, sarc, top) - np.interp(s - 1, sarc, top)
         phi = np.degrees(np.arctan2(dz, dx))
-        PLACEMENT[side] = dict(x=float(x), z=float(z), phi=float(phi), seat=SEAT)
-        return man.translate([0, 0, SEAT]).rotate([0, -phi, 0]).translate([x, 0, z])
+        M = np.eye(4); M[:3, :3] = ry(-phi); M[:3, 3] = [x, 0, z]
+        T0 = np.eye(4); T0[2, 3] = SEAT
+        return M @ T0
 else:
-    ang_len = 2 * R * 1.4
-    band_cs = cs_from_shapely(Polygon([(-W / 2, -T), (W / 2, -T), (W / 2, 0), (-W / 2, 0)]).buffer(-1.5, join_style=1).buffer(1.5, join_style=1))
-    band = along_x(band_cs.extrude(ang_len, n_divisions=120), ang_len).warp_batch(
-        lambda p: np.column_stack([(R + p[:, 2]) * np.sin(p[:, 0] / R), p[:, 1], (R + p[:, 2]) * np.cos(p[:, 0] / R) - R]))
-    th = np.degrees(A.place / R)
-    def place(man, side):
-        return man.translate([0, 0, R]).rotate([0, side * th, 0]).translate([0, 0, -R])
-
-R_w, L_w = place(right, 1), place(left, -1)
-for nm, part in [("right", R_w), ("left", L_w)]:
-    clash = (part ^ band).volume()
-    print(f"collision {nm} ear vs headband: {clash:.2f} mm^3")
+    band = None
+    def place_matrix(side):
+        th = side * A.place / R
+        M = np.eye(4); M[:3, :3] = ry(np.degrees(th)); M[:3, 3] = [R * np.sin(th), 0, R * np.cos(th) - R]
+        return M
+def tf(man, M):
+    return man.transform(np.asarray(M)[:3, :])
+ML, MR = place_matrix(1), place_matrix(-1)
+world = {"ear_L": tf(earL, ML), "clip_L": tf(clip_b, ML), "insert_L": tf(ins_L, ML),
+         "ear_R": tf(earR, MR), "clip_R": tf(clipR, MR), "insert_R": tf(ins_R, MR)}
 scene = trimesh.Scene()
-for man, name in [(band, "band"), (R_w, "right"), (place(ins_r, 1), "right_insert"),
-                  (L_w, "left"), (place(ins_r.mirror([1, 0, 0]), -1), "left_insert")]:
-    scene.add_geometry(tm_of(man), node_name=name)
+if band is not None:
+    scene.add_geometry(tm_of(band), node_name="band")
+    for side in "LR":
+        clash = ((world[f"ear_{side}"] + world[f"clip_{side}"]) ^ band).volume()
+        fit = (world[f"ear_{side}"] ^ world[f"clip_{side}"]).volume()
+        print(f"side {side}: clash with headband {clash:.2f} mm^3, ear/clip interference {fit:.2f} mm^3")
+for k, m in world.items():
+    scene.add_geometry(tm_of(m), node_name=k)
 scene.export(os.path.join(A.out, "preview_as_worn.glb"))
-print("preview written")
-if A.band_stl:
-    import json
-    json.dump(dict(placement={str(k): v for k, v in PLACEMENT.items()}, zmin=ZMIN, tag=tag),
-              open(os.path.join(A.out, "placement.json"), "w"), indent=1)
+import json
+json.dump(dict(placement={"L": ML.tolist(), "R": MR.tolist()}, print_to_part=PRINT, tag=tag, clip=CLIP_NAME),
+          open(os.path.join(A.out, "placement.json"), "w"), indent=1)
+print("preview + placement written")

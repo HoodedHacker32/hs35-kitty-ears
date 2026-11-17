@@ -14,7 +14,7 @@ ap = argparse.ArgumentParser()
 ap.add_argument("--band", required=True)
 ap.add_argument("--velcro-l", required=True)
 ap.add_argument("--velcro-r", required=True)
-ap.add_argument("--ears", default="out_final_v3")
+ap.add_argument("--ears", default="out_v3")
 ap.add_argument("--out", default="viewer_scene.glb")
 ap.add_argument("--ear-faces", type=int, default=110000)
 ap.add_argument("--public", action="store_true", help="replace the Printables headband/anchor meshes with a stand-in rebuilt from measurements")
@@ -171,34 +171,42 @@ else:
 
 preview = trimesh.load(os.path.join(A.ears, "preview_as_worn.glb"))
 pg = {n: preview.geometry[preview.graph.get(n)[1]] for n in preview.graph.nodes_geometry}
-for side, key, fname in (("L", "1", f"cat_ear_LEFT_{tag}.stl"), ("R", "-1", f"cat_ear_RIGHT_{tag}.stl")):
-    p = pl["placement"][key]
-    m = trimesh.load(os.path.join(A.ears, fname))
-    if len(m.faces) > A.ear_faces:
-        m = m.simplify_quadric_decimation(face_count=A.ear_faces)
-    M = tr(p["x"], 0, p["z"]) @ ry(-p["phi"]) @ tr(0, 0, p["seat"] + pl["zmin"][fname])
-    # verify against the as-worn preview mesh
-    world = m.copy(); world.apply_transform(M)
-    ref = pg["right" if side == "L" else "left"]
-    err = np.abs(world.bounds - ref.bounds).max()
-    print(f"ear {side}: {len(m.faces)} faces, placement check max bbox error {err:.2f} mm")
-    assert err < 1.0
-    add(m, f"ear_{side}", matrix=M)
-    ins = pg["right_insert" if side == "L" else "left_insert"].copy()
-    add(ins, f"insert_{side}")
+P2P = {k: np.array(v) for k, v in pl["print_to_part"].items()}
+FLIPX = np.diag([-1.0, 1, 1, 1])
+for side in ("L", "R"):
+    Mp = np.array(pl["placement"][side])
+    parts_ = [("ear", f"ear_{'LEFT' if side == 'L' else 'RIGHT'}.stl", Mp @ P2P[f"ear_{'LEFT' if side == 'L' else 'RIGHT'}.stl"]),
+              ("clip", pl["clip"], Mp @ (FLIPX if side == "R" else np.eye(4)) @ P2P[pl["clip"]])]
+    for kind, fname, M in parts_:
+        m = trimesh.load(os.path.join(A.ears, fname))
+        if len(m.faces) > A.ear_faces:
+            m = m.simplify_quadric_decimation(face_count=A.ear_faces)
+        world = m.copy(); world.apply_transform(M)
+        err = np.abs(world.bounds - pg[f"{kind}_{side}"].bounds).max()
+        print(f"{kind} {side}: {len(m.faces)} faces (print frame), placement check max bbox error {err:.2f} mm")
+        assert err < 1.0
+        add(m, f"{kind}_{side}", matrix=M)
+    add(pg[f"insert_{side}"].copy(), f"insert_{side}")
 
 # ---- earcups and pads, sculpted as distance fields to match Corsair's product photos
 from skimage.measure import marching_cubes
 from scipy.ndimage import gaussian_filter
 
 CUP = dict(x=111.0, z=-186.0, a=41.0, b=52.0, n=2.35)   # centre (world), semi-axes front/back (a) and up/down (b)
-DISC = dict(y=6.0, z=-3.0, r=27.6)                      # textured disc, offset toward the back
+DISC = dict(y=0.0, z=11.0, r=27.5)                      # textured disc: centred front/back, high on the face (as on the real cup)
 meta["cup"] = CUP; meta["disc"] = DISC
 
 def sq_sdf(Y, Z, a, b, n):
     """approx. signed distance to a superellipse outline (negative inside)"""
     f = (np.abs(Y / a) ** n + np.abs(Z / b) ** n) ** (1 / n)
     return (f - 1) * min(a, b) * 0.95
+
+def egg_sdf(Y, Z, a, zc, bottom, n=2.4):
+    """Real cup outline: a circle of radius a around the disc centre (zc) on top, a fuller superellipse below."""
+    b = zc - bottom
+    top = np.hypot(Y, Z - zc) - a
+    f = (np.abs(Y / a) ** n + np.abs((Z - zc) / b) ** n) ** (1 / n)
+    return np.where(Z >= zc, top, (f - 1) * a)
 
 def round_inter(ds, rr):
     ds = [d + rr for d in ds]; pos = sum(np.maximum(d, 0) ** 2 for d in ds); mx = ds[0]
@@ -215,7 +223,7 @@ def mc(field, origin, r, sigma=0.6):
 r = 0.38
 xs = np.arange(-2, 30, r, dtype=np.float32); ys = np.arange(-46, 46, r, dtype=np.float32); zs = np.arange(-58, 58, r, dtype=np.float32)
 X, Y, Z = np.meshgrid(xs, ys, zs, indexing="ij")
-outline = sq_sdf(Y, Z, CUP["a"], CUP["b"], CUP["n"])
+outline = egg_sdf(Y, Z, CUP["a"], DISC["z"], -CUP["b"])
 # Shape from close-ups of the real cup: FLAT outer face, crisp ~2 mm edge, near-straight side wall
 # that tapers slightly toward the face, a parting-line groove at the pad seam, the textured disc set
 # in a glossy sloped dish, and a long recessed panel along the front edge carrying "// HS35".
@@ -227,17 +235,18 @@ shell = np.maximum(shell, -groove)
 dd = np.sqrt((Y - DISC["y"]) ** 2 + (Z - DISC["z"]) ** 2)
 x_floor = D - 2.6
 meta["disc_floor_x"] = float(x_floor)
-recess = np.maximum(dd - (DISC["r"] + 0.45) - (X - x_floor) * 1.6, x_floor - X)   # wide sloped dish (glossy bezel)
-meta["bezel"] = dict(r0=DISC["r"] + 0.45, x0=float(x_floor), slope=1.6, x1=float(D))
+BEZ_SLOPE = (35.0 - (DISC["r"] + 0.45)) / 2.6                       # wide glossy bezel out to r = 35 mm
+recess = np.maximum(dd - (DISC["r"] + 0.45) - (X - x_floor) * BEZ_SLOPE, x_floor - X)
+meta["bezel"] = dict(r0=DISC["r"] + 0.45, x0=float(x_floor), slope=float(BEZ_SLOPE), x1=float(D))
 shell = np.maximum(shell, -recess)
 th = np.arctan2(Z - DISC["z"], Y - DISC["y"])
-arc_r, a0, a1 = 35.2, np.radians(112), np.radians(190)
+arc_r, a0, a1 = 38.2, np.radians(117), np.radians(203)   # narrow slot right at the front edge
 thw = np.where(th < 0, th + 2 * np.pi, th)
 in_range = (thw > a0) & (thw < a1)
 end0 = np.hypot(Y - (DISC["y"] + arc_r * np.cos(a0)), Z - (DISC["z"] + arc_r * np.sin(a0)))
 end1 = np.hypot(Y - (DISC["y"] + arc_r * np.cos(a1)), Z - (DISC["z"] + arc_r * np.sin(a1)))
 dist_arc = np.where(in_range, np.abs(dd - arc_r), np.minimum(end0, end1))
-panel = np.maximum(dist_arc - 4.4, (D - 1.1) - X)
+panel = np.maximum(dist_arc - 1.5, (D - 1.3) - X)
 shell = np.maximum(shell, -panel)
 mid = np.radians(151)
 meta["pill"] = dict(x=float(D - 1.1), y=float(DISC["y"] + arc_r * np.cos(mid)), z=float(DISC["z"] + arc_r * np.sin(mid)), ang=float(mid))
@@ -247,7 +256,7 @@ print("cup shell", len(cupL.faces), cupL.is_watertight)
 # pad: fat rounded ring that follows the cup outline, pointing toward the head (-x)
 xp = np.arange(-30, 2, r, dtype=np.float32)
 Xp, Yp, Zp = np.meshgrid(xp, ys, zs, indexing="ij")
-o_out = sq_sdf(Yp, Zp, CUP["a"] + 0.6, CUP["b"] + 0.6, CUP["n"])   # fabric bulges just past the shell rim
+o_out = egg_sdf(Yp, Zp, CUP["a"] + 0.6, DISC["z"], -CUP["b"] - 0.6)   # fabric bulges just past the shell rim
 o_in = sq_sdf(Yp, Zp, 20.0, 30.0, 2.2)
 bulge = 1.8 * np.clip(1 - ((Xp + 12) / 14) ** 2, 0, 1)
 pad = round_inter([o_out - bulge, -o_in - bulge, -Xp - 25.5, Xp - 0.6], 9.0)

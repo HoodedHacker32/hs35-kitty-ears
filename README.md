@@ -1,46 +1,53 @@
 # Snap-on cat ears: Corsair HS35 v2 / HS35 Surround v2
 
-**Live 3D viewer:** https://hoodedhacker32.github.io/hs35-kitty-ears/ (it works on mobile; give it a few seconds to load)
+**Live 3D viewer:** https://hoodedhacker32.github.io/hs35-kitty-ears/ (works on mobile; give it a few seconds to load)
 
-Soft, rounded "hood" ears with a thick rim and a recessed inner ear. Each ear covers the full depth of the headband and snaps under both edges.
+Soft, rounded "hood" cat ears that snap onto the headband. Each ear has three parts, and **nothing needs supports**:
 
-## Print these (in `out_final_v3/`)
+| Part | File (in `out_v3/`) | Filament | Print orientation | Qty |
+|---|---|---|---|---|
+| Ear | `ear_LEFT.stl`, `ear_RIGHT.stl` | Bambu **PLA Matte Charcoal** | Lying on its flat back, as exported | 1 each |
+| Clip | `clip_W35.6_T7.5_print_x2.stl` | Bambu **PETG Basic Black** | Standing on its end, as exported | **2** |
+| Inner ear | `inner_ear_insert_LEFT.stl`, `inner_ear_insert_RIGHT.stl` | Bambu **PLA Matte Sakura Pink** | Flat, as exported | 1 each |
 
-> LEFT and RIGHT are from the wearer's point of view.
+LEFT and RIGHT are from the wearer's point of view.
 
-| File | Colour | Orientation | Qty |
-|---|---|---|---|
-| `cat_ear_RIGHT_W35.6_T7.5.stl` | Black | Upright, as exported | 1 |
-| `cat_ear_LEFT_W35.6_T7.5.stl` | Black | Upright, as exported | 1 |
-| `inner_ear_insert_RIGHT.stl` | Pink (or black/grey) | Flat, as exported | 1 |
-| `inner_ear_insert_LEFT.stl` | Pink (or black/grey) | Flat, as exported | 1 |
+## Why it's split up
+- **The clip is the only part that flexes.** It prints standing on its end, so every layer contains the whole clip profile, and the snap hooks bend *along* the layer lines rather than prying them apart. That's why it's PETG: it's tough and springy.
+- **The ear doesn't flex,** so it can be matte PLA, which matches the headset's matte finish and is easier to print. Its back is one flat plane with a 35° chamfered edge, so it prints lying down with **zero supports**. The hood, inner-ear pocket and rail groove are all shaped to be self-supporting in that orientation. Checked: the overhang area needing support is effectively zero (under 3 mm² of 15,000 mm²).
+- **The ear slides onto the clip** on a dovetail rail (0.15 mm side clearance, 0.25 mm top), so the two materials don't have to print together.
+
+## Print settings (Bambu printer)
+- **Ears (PLA Matte):** 0.16 mm layers (0.12 mm for even finer side walls), 3 walls, 15% infill, no supports, no brim needed.
+- **Clips (PETG Basic):** 0.20 mm layers, **4 walls**, 100% infill (they're small, and solid is strongest), no supports. Use a **brim** because it's tall and narrow (62 mm).
+- **Inner ears (PLA Matte):** 0.16 mm, flat, no supports.
+- **Filament used, both ears:** about 66 g Charcoal, 28 g black PETG and 10 g Sakura Pink.
+
+## Assembly
+1. Press each pink inner ear into its ear's pocket (a dab of glue if loose).
+2. Slide each ear onto a clip's dovetail rail from one end until it's centred. A small drop of superglue or epoxy on the rail makes it permanent. Optional, but recommended.
+3. Hold the ear over the headband about 50 mm out from the centre of the "CORSAIR" logo and press straight down until both hooks click under the band's edges. To remove it, flex one clip wall outward.
+
+## Filament notes
+- **PETG HF is being discontinued** in most colours. Bambu relaunched **PETG Basic** in 2026 as the successor, and it's what the clips use. Avoid *matte* PETG for the clips: the matte additive makes it stiffer and more brittle, which is the opposite of what a snap clip wants.
+- **Cheaper alternatives:** any 1.75 mm filament works on a Bambu printer. Use the "Generic PLA" or "Generic PETG" profile.
+  - Matte black PLA: SUNLU or ELEGOO matte PLA run roughly $10–14/kg versus about $20+/kg for Bambu (ELEGOO's matte black is noted as especially deep and flat). JAYO is a mid-price option on plastic spools that the AMS likes.
+  - PETG: SUNLU / ELEGOO PETG in black are similar savings.
+  - Pink: "Sakura Pink" is a Bambu shade. Third-party pinks vary, so check photos if the exact shade matters. Only about 10 g is needed, so the Bambu spool or a friend's leftovers may be the sensible choice.
+  - Check spool weight (some cheap spools are 0.65 kg, not 1 kg) and prefer plastic spools for the AMS.
 
 ## Fit
-The clip is sized from the HS35 v2 headband model ([Printables 1869509](https://www.printables.com/model/1869509-corsair-hs35-v2-headband-replacement)):
-- Band width: 35.6 mm
-- Edge depth (top surface to bottom of the edge lips): 7.5 mm
-- Top edges: 3 mm chamfers
-- Arch radius where the ears sit: 91.5 mm
-
-Clearance is 0.2 mm on each side. Each hook reaches 1.3 mm under the band's 1.6 mm edge lips. The clip also fills the chamfers so it can't rock. In a collision check against the real headband model, the overlap was effectively zero (0.34 mm³, meshing noise). The ears are designed to sit about 50 mm either side of the centre of the "CORSAIR" logo, measured along the band.
-
-## Print settings
-- **PETG recommended.** The clip side walls flex ~1.3 mm to snap on, and PLA may crack over time.
-- Ears: upright as exported, in **Bambu PETG HF Black** at 0.16 mm layers (0.12 mm for an even smoother finish), with **tree supports** (for the hood over the inner-ear pocket and the gap under the curved clip walls), a brim, 3 walls and 15–20% infill.
-- Inserts: flat, no supports, in **Bambu PLA Matte Sakura Pink** (or Charcoal / Ash Grey). Press them into the pocket, with a dab of glue if loose.
-- **Fitting:** hold the ear over the band and press straight down until both hooks click under the edges. To remove, flex one side wall outward.
-- If the fit is too tight or too loose, regenerate with e.g. `--thick 7.3` (tighter) or `--thick 7.7` (looser).
+The clip is sized from the HS35 v2 headband model ([Printables 1869509](https://www.printables.com/model/1869509-corsair-hs35-v2-headband-replacement)): band 35.6 mm wide, 7.5 mm edge depth, 3 mm top chamfers, 91.5 mm arch radius. The hooks reach 1.3 mm under the 1.6 mm edge lips. A collision check against the real headband model shows no interference. If the snap is too tight or loose, regenerate with `--thick 7.3` (tighter) or `--thick 7.7` (looser).
 
 ## Regenerating
 ```
 pip install manifold3d trimesh numpy shapely scikit-image scipy matplotlib
-python cat_ears_v2.py --band-stl corsair_hs_35_v2_headband.stl --out out_final_v3
+python cat_ears_v3.py --band-stl corsair_hs_35_v2_headband.stl --out out_v3
 ```
-Options: `--height 80` makes the ears taller, and `--place 55` moves them further out (used for the preview and collision check).
+`--height 80` makes taller ears. `--place 55` moves them further out (used for the preview and collision check).
 
-## Realistic preview
-Open `index.html` (or the live link above) in Chrome, Edge or Safari to see the ears on the full HS35 v2 with print-accurate materials. Rebuild it with `build_viewer_scene.py` followed by `build_viewer_html.py`.
+The viewer (`index.html`) is rebuilt with `build_viewer_scene.py` followed by `build_viewer_html.py`.
 
 ## Credits and licence
-- Headband and strap-anchor geometry in the viewer, and the measurements the clip is sized from: [Corsair HS35 v2 headband replacement on Printables](https://www.printables.com/model/1869509-corsair-hs35-v2-headband-replacement), licensed CC BY-NC. Because the ears are fitted to that model, this whole project is shared under **CC BY-NC 4.0**: non-commercial use only, with attribution.
+- Headband and strap-anchor geometry in the viewer, and the measurements the clip is sized from: [Corsair HS35 v2 headband replacement on Printables](https://www.printables.com/model/1869509-corsair-hs35-v2-headband-replacement), CC BY-NC. Because the ears are fitted to that model, this project is shared under **CC BY-NC 4.0**: non-commercial use only, with attribution.
 - Corsair logo outline from [Simple Icons](https://simpleicons.org/). Corsair and HS35 are trademarks of Corsair. This is a fan project and is not affiliated with Corsair.
