@@ -1,0 +1,12 @@
+# drafts and superseded outputs
+out/
+out_v2/
+out_final/
+viewer.html
+viewer_v2.html
+viewer_final.html
+viewer_realistic.html
+out_final_v3/preview_as_worn.glb
+cat_ears.py
+.claude/
+__pycache__/
