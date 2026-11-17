@@ -1,9 +1,10 @@
 # Snap-on cat ears: Corsair HS35 v2 / HS35 Surround v2
 
 **Live 3D viewer:** https://hoodedhacker32.github.io/hs35-kitty-ears/ (works on mobile; give it a few seconds to load)
-**Animated assembly guide:** https://hoodedhacker32.github.io/hs35-kitty-ears/assembly.html
+**Animated assembly guide (with sound):** https://hoodedhacker32.github.io/hs35-kitty-ears/assembly.html
+**Assembly video (1080p60):** https://hoodedhacker32.github.io/hs35-kitty-ears/assembly.mp4
 
-Soft, rounded "hood" cat ears that snap onto the headband. Each ear has three parts, and **nothing needs supports**:
+Soft, rounded "hood" cat ears that snap onto the headband. Each ear has three parts, **nothing needs supports, and nothing needs glue**: every joint clicks together and comes apart again.
 
 | Part | File (in `out_v3/`) | Filament | Print orientation | Qty |
 |---|---|---|---|---|
@@ -15,8 +16,13 @@ LEFT and RIGHT are from the wearer's point of view.
 
 ## Why it's split up
 - **The clip is the only part that flexes.** It prints standing on its end, so every layer contains the whole clip profile, and the snap hooks bend *along* the layer lines rather than prying them apart. That's why it's PETG: it's tough and springy.
-- **The ear doesn't flex,** so it can be matte PLA, which matches the headset's matte finish and is easier to print. Its back is one flat plane with a 35° chamfered edge, so it prints lying down with **zero supports**. The hood, inner-ear pocket and rail groove are all shaped to be self-supporting in that orientation. Checked: the overhang area needing support is effectively zero (under 3 mm² of 15,000 mm²).
+- **The ear doesn't flex,** so it can be matte PLA, which matches the headset's matte finish and is easier to print. Its back is one flat plane with a 35° chamfered edge, so it prints lying down with **zero supports**. The hood, inner-ear pocket and rail groove are all shaped to be self-supporting in that orientation. Checked: the overhang area needing support is effectively zero (about 15 mm² of 11,700 mm², nearly all of it the 0.2 mm ledges under the insert tabs, which print fine).
 - **The ear slides onto the clip** on a dovetail rail (0.15 mm side clearance, 0.25 mm top), so the two materials don't have to print together.
+
+## How the parts click together (no glue)
+- **Ear onto clip:** the rail groove in the ear is closed at its outer end, so the end of the rail is a hard stop. Hidden in the back of the ear's base is a 16 mm spring finger with a small ridge on its underside (0.6 mm tall). It rides up over the clip, then drops into a notch in the clip plate with a click. The finger lies flat in the ear's layers, so it bends along the layer lines (about 0.9% strain, well inside what PLA takes repeatedly). The ridge has a gentle 35° face going on and a 40° face coming off, and it presses 0.08 mm into the notch so the ear can't rattle. Roughly 12 N to push on and 14 N to pull off. The notch is cut at both ends of the clip, so the same clip print works on either side.
+- **Inner ear into ear:** the pink insert sits in an exact pocket (0.08 mm clearance). Three small tabs (at the tip and both lower corners) overlap its edge by 0.12 mm. The insert has a chamfered back edge, so it pushes in past the tabs and clicks. To take it out, lever it out from the rim with a fingernail.
+- **Clip onto headband:** unchanged. Both hooks snap under the band's edge lips.
 
 ## Print settings (Bambu printer)
 - **Ears (PLA Matte):** for speed, 0.20 mm layers, 2 walls, 10% infill (use 0.16 mm and 3 walls for a finer finish), no supports, no brim needed.
@@ -25,9 +31,11 @@ LEFT and RIGHT are from the wearer's point of view.
 - **Filament used, both ears:** about 66 g Charcoal, 28 g black PETG and 10 g Sakura Pink.
 
 ## Assembly
-1. Press each pink inner ear into its ear's pocket (a dab of glue if loose).
-2. Slide each ear onto a clip's dovetail rail from one end until it's centred. A small drop of superglue or epoxy on the rail makes it permanent. Optional, but recommended.
+1. Press each pink inner ear into its ear's pocket until it clicks past the three tabs.
+2. Slide the clip's rail into the ear's groove from the **inner** end of the ear (the end nearer the middle of the headband). Push until the rail hits the closed end and the spring finger clicks into the notch. To remove it, pull the ear firmly outward along the rail.
 3. Hold the ear over the headband about 50 mm out from the centre of the "CORSAIR" logo and press straight down until both hooks click under the band's edges. To remove it, flex one clip wall outward.
+
+If a click is too stiff or too loose, it's a print-tolerance thing: scale the ear by ±0.3% in the slicer, or adjust `RH` (ridge height) and `TAB_IN` (tab overlap) in `cat_ears_v3.py`.
 
 ## Cheapest verified filament (Amazon.ie, checked 17 Nov 2026)
 All 1.75 mm, so they work in any Bambu printer (Generic PLA / Generic PETG profile). Each plate uses **one filament only**, so there are no colour swaps and no purge waste, and the AMS isn't needed.
@@ -62,7 +70,14 @@ python cat_ears_v3.py --band-stl corsair_hs_35_v2_headband.stl --out out_v3
 ```
 `--height 80` makes taller ears. `--place 55` moves them further out (used for the preview and collision check).
 
-The viewer (`index.html`) is rebuilt with `build_viewer_scene.py` followed by `build_viewer_html.py`.
+The viewer (`index.html`) is rebuilt with `build_viewer_scene.py` followed by `build_viewer_html.py`. The assembly guide uses the same scene and template plus `assembly_film.js`:
+```
+python build_viewer_scene.py --band band.stl --velcro-l velcro_l.stl --velcro-r velcro_r.stl --ears out_v3 --out viewer_scene.glb
+python build_viewer_html.py viewer_scene.glb viewer_scene.json viewer_realistic_template.html index.html
+python build_viewer_html.py viewer_scene.glb viewer_scene.json viewer_realistic_template.html assembly.html --mode=assembly
+python render_video.py          # with this folder served on 127.0.0.1:8766 -> assembly.mp4
+```
+The soundtrack is synthesised in the page (Web Audio, rendered offline so every click lands exactly on its frame). `assembly_soundtrack.m4a` is the same audio pre-rendered, so the page doesn't have to synthesise it before playing.
 
 ## Credits and licence
 - Headband and strap-anchor geometry in the viewer, and the measurements the clip is sized from: [Corsair HS35 v2 headband replacement on Printables](https://www.printables.com/model/1869509-corsair-hs35-v2-headband-replacement), CC BY-NC. Because the ears are fitted to that model, this project is shared under **CC BY-NC 4.0**: non-commercial use only, with attribution.

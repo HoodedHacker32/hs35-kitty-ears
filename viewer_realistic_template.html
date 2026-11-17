@@ -22,6 +22,7 @@
   .lbl { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.06em; margin-top:10px; }
   #toggle { display:none; }
   #loading { position:fixed; inset:0; display:grid; place-items:center; color:var(--muted); font-size:13px; }
+  body.film #info, body.film #views { display:none; }
   @media (max-width: 700px) { #info { width:auto; right:16px; max-height:42vh; overflow:auto; } #info.min .body { display:none; } #toggle { display:inline-block; float:right; } }
 </style>
 </head>
@@ -35,7 +36,7 @@
   <div class="body">
     <div class="mat"><i class="sw" style="background:#26262a"></i><b>Ears: Bambu PLA Matte, Charcoal</b><span>Printed lying on their flat back, with no supports. The layer lines come from that orientation.</span></div>
     <div class="mat"><i class="sw" style="background:#0b0b0c"></i><b>Clips: Bambu PETG Basic, Black</b><span>Printed standing on end, so the snap hooks flex along the layers, not across them.</span></div>
-    <div class="mat"><i class="sw" id="insSw" style="background:#e9b3c6"></i><b id="insName">Inner ear: Bambu PLA Matte, Sakura Pink</b><span>Printed flat. Presses into the ear.</span></div>
+    <div class="mat"><i class="sw" id="insSw" style="background:#e9b3c6"></i><b id="insName">Inner ear: Bambu PLA Matte, Sakura Pink</b><span>Printed flat. Clicks into the ear past three small tabs. No glue anywhere.</span></div>
     <div class="mat"><i class="sw" style="background:#1a1a1d"></i><b>Headset: HS35 v2</b><span>Real headband and strap-anchor geometry; cups, pads, strap, mic and cable modelled from Corsair's product photos.</span></div>
     <div class="lbl">Layer height</div>
     <div class="row" id="lh"><button data-v="0.08">0.08 mm</button><button data-v="0.12">0.12 mm</button><button data-v="0.16" aria-pressed="true">0.16 mm</button><button data-v="0.20">0.20 mm</button></div>
@@ -70,8 +71,11 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
 const META = JSON.parse(document.getElementById('meta').textContent);
+const MODE = '__MODE__';
+if (MODE === 'assembly') document.body.classList.add('film');
 const canvas = document.getElementById('c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
 const MOBILE = matchMedia('(pointer: coarse)').matches || innerWidth < 760;
@@ -230,11 +234,11 @@ const T = {
 
 // ------------------------------------------------------------------ materials
 const M = {};
-M.band = new THREE.MeshPhysicalMaterial({ color: 0x0d0d0f, roughness: 0.26, normalMap: T.grainN, normalScale: new THREE.Vector2(0.08, 0.08), clearcoat: 0.6, clearcoatRoughness: 0.12 });
+M.band = new THREE.MeshPhysicalMaterial({ color: 0x0d0d0f, roughness: 0.34, normalMap: T.grainN, normalScale: new THREE.Vector2(0.08, 0.08), clearcoat: 0.35, clearcoatRoughness: 0.2 });
 M.band.normalMap = T.grainN.clone(); M.band.normalMap.repeat.set(1 / 6, 1 / 6); M.band.normalMap.needsUpdate = true;
 M.anchor = new THREE.MeshPhysicalMaterial({ color: 0x121214, roughness: 0.7 });
 M.shell = new THREE.MeshPhysicalMaterial({ color: 0x141416, roughness: 0.56, clearcoat: 0.08, clearcoatRoughness: 0.5 });
-M.bezel = new THREE.MeshPhysicalMaterial({ color: 0x8a8d93, metalness: 1.0, roughness: 0.07, clearcoat: 1, clearcoatRoughness: 0.03, side: THREE.DoubleSide });   // chrome-like ring, as on the real cup
+M.bezel = new THREE.MeshPhysicalMaterial({ color: 0x55585e, metalness: 0.85, roughness: 0.22, clearcoat: 1, clearcoatRoughness: 0.08, side: THREE.DoubleSide });   // satin gunmetal ring with a glossy coat, as on the real cup
 M.trim = new THREE.MeshPhysicalMaterial({ color: 0x1e1f23, roughness: 0.3, metalness: 0.2 });
 M.recess = new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.9 });
 M.logo = new THREE.MeshPhysicalMaterial({ color: 0x101012, metalness: 0.7, roughness: 0.12, clearcoat: 1, clearcoatRoughness: 0.03, transparent: true, polygonOffset: true, polygonOffsetFactor: -4 });
@@ -261,13 +265,21 @@ for (const [k, m] of Object.entries(M)) m.envMapIntensity = k === 'gloss' ? ENV.
 const PRINT = { layer: { value: 0.16 } };
 function printedMaterial(opts, mode) {
   const m = new THREE.MeshPhysicalMaterial(opts);
+  m.userData.u = { uCut: { value: 1e6 }, uHot: { value: 0 }, uCap: { value: new THREE.Color(opts.color).multiplyScalar(1.6).addScalar(0.012) } };
   m.onBeforeCompile = (sh) => {
-    sh.uniforms.uLayer = PRINT.layer;
+    sh.uniforms.uLayer = PRINT.layer; Object.assign(sh.uniforms, m.userData.u);
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vPrintPos; varying vec3 vPrintZ; varying vec3 vPrintX; varying vec3 vPrintD;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvPrintPos = position;\nvPrintZ = normalize((viewMatrix * modelMatrix * vec4(0.,0.,1.,0.)).xyz);\nvPrintX = normalize((viewMatrix * modelMatrix * vec4(1.,0.,1.,0.)).xyz);\nvPrintD = normalize((viewMatrix * modelMatrix * vec4(0.7071,0.7071,0.,0.)).xyz);');
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform float uLayer; varying vec3 vPrintPos; varying vec3 vPrintZ; varying vec3 vPrintX; varying vec3 vPrintD;')
+      .replace('#include <common>', '#include <common>\nuniform float uLayer; uniform float uCut; uniform float uHot; uniform vec3 uCap; varying vec3 vPrintPos; varying vec3 vPrintZ; varying vec3 vPrintX; varying vec3 vPrintD;')
+      .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\nif (vPrintPos.z > uCut) discard;')
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += vec3(1.0, 0.42, 0.16) * 0.45 * uHot * (1.0 - smoothstep(0.0, 0.7, uCut - vPrintPos.z));')
+      .replace('#include <dithering_fragment>', `#include <dithering_fragment>
+      if (!gl_FrontFacing) {   // looking into a part that is still printing: show its top layer
+        float ln = 0.5 + 0.5 * sin(dot(vPrintPos.xy, vec2(0.7071)) / 0.42 * 6.2831853);
+        gl_FragColor = vec4(uCap * (0.85 + 0.15 * ln) + vec3(1.0, 0.42, 0.16) * uHot * 0.04, 1.0);
+      }`)
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
       {
         ${mode === 'walls' ? `
@@ -304,10 +316,10 @@ function printedMaterial(opts, mode) {
   m.customProgramCacheKey = () => 'print-' + mode;
   return m;
 }
-M.petg = printedMaterial({ color: 0x0b0b0c, roughness: 0.3, specularIntensity: 0.75, clearcoat: 0.12, clearcoatRoughness: 0.3, sheen: 0 }, 'walls');
+M.petg = printedMaterial({ color: 0x0b0b0c, roughness: 0.42, specularIntensity: 0.5, clearcoat: 0.05, clearcoatRoughness: 0.4, sheen: 0 }, 'walls');
 M.earPLA = printedMaterial({ color: 0x232327, roughness: 0.82, specularIntensity: 0.4 }, 'walls');
 M.pla = printedMaterial({ color: new THREE.Color('#e9b3c6'), roughness: 0.82, specularIntensity: 0.35 }, 'top');
-M.petg.envMapIntensity = ENV.petg; M.earPLA.envMapIntensity = 0.6; M.pla.envMapIntensity = 0.55;
+M.petg.envMapIntensity = 0.7; M.earPLA.envMapIntensity = 0.6; M.pla.envMapIntensity = 0.55;
 
 // ------------------------------------------------------------------ helpers
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -325,9 +337,9 @@ const CUP = META.cup, DISC = META.disc;
 function buildSide(s) {
   const g = new THREE.Group(); g.position.set(s * CUP.x, 0, CUP.z); g.scale.x = s; world.add(g);
   // textured disc sitting in its recess, with the printed sails logo
-  const disc = mesh(new THREE.CircleGeometry(DISC.r - 0.35, 180), M.disc, g); basis(disc, V(0, 1, 0), V(0, 0, 1), V(1, 0, 0)); disc.position.set(META.disc_floor_x + 0.05, DISC.y, DISC.z);
+  const disc = mesh(new THREE.CircleGeometry(DISC.r - 0.35, 180), M.disc, g); basis(disc, V(0, 1, 0), V(0, 0, 1), V(1, 0, 0)); disc.position.set(META.disc_floor_x + 0.3, DISC.y, DISC.z);
   const [lc, lx] = canvas2d(1024); drawLogo(lx, 1024, '#ffffff');
-  const logo = decal(lc, 16, 16, M.logo); basis(logo, V(0, 1, 0), V(0, 0, 1), V(1, 0, 0)); logo.position.set(META.disc_floor_x + 0.09, DISC.y + 1, DISC.z + 1.5); if (s < 0) logo.scale.x = -1; g.add(logo);
+  const logo = decal(lc, 16, 16, M.logo); basis(logo, V(0, 1, 0), V(0, 0, 1), V(1, 0, 0)); logo.position.set(META.disc_floor_x + 0.36, DISC.y + 1, DISC.z + 1.5); if (s < 0) logo.scale.x = -1; g.add(logo);
   // glossy sloped bezel lining the dish around the disc (catches light almost like chrome on the real cup)
   { const B = META.bezel, pts = [];
     for (let i = 0; i <= 12; i++) { const x = B.x0 + (B.x1 - B.x0) * i / 12; pts.push(new THREE.Vector2(B.r0 + (x - B.x0) * B.slope + 0.25, x + 0.12)); }
@@ -365,9 +377,9 @@ const gm = M.grille.clone(); gm.normalMap = T.grilleN.clone(); gm.normalMap.repe
 mesh(new THREE.CylinderGeometry(3.4, 3.4, 11, 48), gm, capsule).position.y = 6;
 mesh(new THREE.SphereGeometry(3.4, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), gm, capsule).position.y = 11.5;
 const plug = mesh(new THREE.CylinderGeometry(3.3, 3.3, 9, 32), M.rubber); plug.position.copy(micPath.getPoint(0.02)); plug.quaternion.setFromUnitVectors(V(0, 1, 0), micPath.getTangent(0));
-const cablePath = new THREE.CatmullRomCurve3([V(CUP.x + 9, 6, CUP.z - 48), V(CUP.x + 7, 12, CUP.z - 74), V(CUP.x - 4, 30, -330), V(CUP.x - 40, 70, -349), V(CUP.x - 130, 40, -349), V(CUP.x - 220, 110, -349), V(CUP.x - 420, 90, -349)]);
+const cablePath = new THREE.CatmullRomCurve3([V(CUP.x + 9, 6.5, CUP.z - 57), V(CUP.x + 7, 12, CUP.z - 74), V(CUP.x - 4, 30, -330), V(CUP.x - 40, 70, -349), V(CUP.x - 130, 40, -349), V(CUP.x - 220, 110, -349), V(CUP.x - 420, 90, -349)]);
 mesh(new THREE.TubeGeometry(cablePath, 400, 1.9, 16), M.rubber);
-const strain = mesh(new THREE.CylinderGeometry(3.2, 2.2, 12, 32), M.rubber); strain.position.set(CUP.x + 9, 7, CUP.z - 53);
+const strain = mesh(new THREE.CylinderGeometry(3.6, 2.3, 13, 32), M.rubber); strain.rotation.x = Math.PI / 2; strain.position.set(CUP.x + 9, 6.5, CUP.z - 51.5);
 
 // ------------------------------------------------------------------ fabric strap between the real anchors
 (function strap() {
@@ -432,7 +444,7 @@ new GLTFLoader().parse(bytes.buffer, '', (gl) => {
   wm.alphaMap = new THREE.TextureLoader().load('__WORDMARK__', tx => { tx.anisotropy = MAXANI; wm.needsUpdate = true; }); wm.alphaMap.wrapS = wm.alphaMap.wrapT = THREE.ClampToEdgeWrapping;
   const word = new THREE.Mesh(g, wm); world.add(word);
   document.getElementById('loading').remove();
-  setView('overview', true);
+  if (MODE === 'assembly') FILM.attach(parts); else setView('overview', true);
 });
 
 // ------------------------------------------------------------------ post-processing
@@ -480,9 +492,11 @@ document.getElementById('ao').onclick = (e) => { useAO = !useAO; e.target.setAtt
 let spin = false; document.getElementById('spin').onclick = (e) => { spin = !spin; ctl.autoRotate = spin; ctl.autoRotateSpeed = 0.8; e.target.setAttribute('aria-pressed', spin); };
 document.getElementById('toggle').onclick = (e) => { const p = document.getElementById('info'); p.classList.toggle('min'); e.target.textContent = p.classList.contains('min') ? 'Show' : 'Hide'; };
 
+/*__FILM__*/
 function size() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); composer.setSize(w, h); cam.aspect = w / h; cam.updateProjectionMatrix(); }
 addEventListener('resize', size); size();
 renderer.setAnimationLoop((now) => {
+  if (MODE === 'assembly') { FILM.frame(now); return; }
   if (anim) {
     const k = Math.min(1, (now - anim.s) / 900), e = k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
     cam.position.lerpVectors(anim.p0, anim.p1, e); ctl.target.lerpVectors(anim.t0, anim.t1, e); if (k >= 1) anim = null;
@@ -492,7 +506,7 @@ renderer.setAnimationLoop((now) => {
   cam.near = Math.max(0.2, cam.position.distanceTo(ctl.target) * 0.02); cam.updateProjectionMatrix();
   if (useAO) composer.render(); else renderer.render(scene, cam);
 });
-window.__ready = () => !document.getElementById('loading');
+window.__ready = () => !document.getElementById('loading') && (MODE !== 'assembly' || FILM.ready);
 window.__look = (p, q) => { anim = null; cam.position.copy(W2V(...p)); ctl.target.copy(W2V(...q)); ctl.update(); cam.near = 0.5; cam.updateProjectionMatrix(); (useAO ? composer : renderer).render(scene, cam); if (useAO) composer.render(); };
 </script>
 </body>

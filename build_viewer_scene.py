@@ -173,6 +173,10 @@ preview = trimesh.load(os.path.join(A.ears, "preview_as_worn.glb"))
 pg = {n: preview.geometry[preview.graph.get(n)[1]] for n in preview.graph.nodes_geometry}
 P2P = {k: np.array(v) for k, v in pl["print_to_part"].items()}
 FLIPX = np.diag([-1.0, 1, 1, 1])
+TILT, PLATE, FLOOR = -8.0, 2.8, -3.0          # from cat_ears_v3.py
+T_PLACE = tr(0, 0, PLATE - 0.4) @ ry(TILT)
+W_INS = np.array([[1, 0, 0, 0], [0, 0, -1, FLOOR], [0, 1, 0, 0], [0, 0, 0, 1.0]])   # (u,v,w) -> (u, FLOOR-w, v)
+parts_meta = {}
 for side in ("L", "R"):
     Mp = np.array(pl["placement"][side])
     parts_ = [("ear", f"ear_{'LEFT' if side == 'L' else 'RIGHT'}.stl", Mp @ P2P[f"ear_{'LEFT' if side == 'L' else 'RIGHT'}.stl"]),
@@ -186,7 +190,18 @@ for side in ("L", "R"):
         print(f"{kind} {side}: {len(m.faces)} faces (print frame), placement check max bbox error {err:.2f} mm")
         assert err < 1.0
         add(m, f"{kind}_{side}", matrix=M)
-    add(pg[f"insert_{side}"].copy(), f"insert_{side}")
+        parts_meta[f"{kind}_{side}"] = dict(final=M.T.flatten().tolist(), h=float(m.bounds[1][2]), ext=m.extents.tolist())
+    # inner-ear insert: printed flat; its pose in the ear pocket (constants from cat_ears_v3.py)
+    iname = f"inner_ear_insert_{'LEFT' if side == 'L' else 'RIGHT'}.stl"
+    m = trimesh.load(os.path.join(A.ears, iname))
+    M = Mp @ T_PLACE @ W_INS @ P2P[iname] if side == "L" else Mp @ FLIPX @ T_PLACE @ W_INS @ FLIPX @ P2P[iname]
+    world = m.copy(); world.apply_transform(M)
+    err = np.abs(world.bounds - pg[f"insert_{side}"].bounds).max()
+    print(f"insert {side}: placement check {err:.2f} mm"); assert err < 1.0
+    add(m, f"insert_{side}", matrix=M)
+    parts_meta[f"insert_{side}"] = dict(final=M.T.flatten().tolist(), h=float(m.bounds[1][2]), ext=m.extents.tolist())
+meta["parts"] = parts_meta
+meta["place"] = {s_: np.array(pl["placement"][s_]).T.flatten().tolist() for s_ in "LR"}
 
 # ---- earcups and pads, sculpted as distance fields to match Corsair's product photos
 from skimage.measure import marching_cubes

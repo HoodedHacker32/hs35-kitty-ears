@@ -2,8 +2,12 @@
 v3: SPLIT, SUPPORT-FREE cat ears for the Corsair HS35 v2 / HS35 Surround v2.
 
 Per side: 1 ear (prints flat on its back, no supports), 1 clip (prints standing on its end so the
-snap hooks flex ALONG the layer lines), 1 inner-ear insert (prints flat). The ear slides onto a
-dovetail rail on the clip (a drop of glue optional).
+snap hooks flex ALONG the layer lines), 1 inner-ear insert (prints flat). NO GLUE:
+  * ear -> clip: the ear slides onto a dovetail rail from the outer end until the rail hits the groove's
+    closed end, and a spring finger in the back of the ear's base clicks a ridge into a notch in the clip.
+    The finger lies in the ear's layer plane, so it flexes along the layers. Pull firmly outward to remove it.
+  * insert -> ear: the insert pushes into an exact pocket past three small retaining tabs (click).
+    To remove it, pry it out at the lip with a fingernail.
 
 Run:  python cat_ears_v3.py [--band-stl corsair_hs_35_v2_headband.stl] [--place 50]
 Defaults are measured from the HS35 v2 headband model (35.6 mm wide, 7.5 mm edge, 91.5 mm arch radius).
@@ -138,7 +142,9 @@ ear = Manifold(m3.Mesh(vert_properties=np.asarray(tm.vertices, np.float32), tri_
 print("ear status", ear.status(), "tris", ear.num_tri())
 
 # inner-ear insert: flat plate, front face slightly domed by a small rounding
-ins_cs = cs_from_shapely(INNER.buffer(-0.2, join_style=1))
+INS_POCKET = 0.08                                      # radial clearance of the insert in its pocket
+TAB_IN = 0.12                                          # how far the retaining tabs overlap the insert edge
+ins_cs = cs_from_shapely(INNER.buffer(0.0, join_style=1))
 def slab_rounded(cs, t, rr=0.8, steps=5):
     parts = [cs.extrude(t - rr)]
     for i in range(steps):
@@ -148,8 +154,28 @@ def slab_rounded(cs, t, rr=0.8, steps=5):
         parts.append(s.extrude(rr / steps).translate([0, 0, t - rr + rr * i / steps]))
     return Manifold.batch_boolean(parts, m3.OpType.Add)
 insert_flat = slab_rounded(ins_cs, INS_T)              # (u=x, v=z, w=thickness) front face at w=INS_T
+lead = Manifold.batch_boolean([ins_cs.offset(-0.4 + 0.1 * i, m3.JoinType.Round).extrude(0.1).translate([0, 0, 0.1 * i])
+                               for i in range(4)], m3.OpType.Add)
+edge_ring = ins_cs.offset(5, m3.JoinType.Round).extrude(0.4) - ins_cs.offset(-0.4, m3.JoinType.Round).extrude(0.4)
+insert_flat = (insert_flat - edge_ring) + lead      # 0.4 mm chamfer on the back edge = lead-in past the tabs
 # as worn: back face on the floor (y=FLOOR), front face toward -y ; map (u,v,w)->(u, FLOOR - w, v)  (det +1)
-insert_worn = insert_flat.warp_batch(lambda p: np.column_stack([p[:, 0], FLOOR - p[:, 2], p[:, 1]]))
+to_worn = lambda m: m.warp_batch(lambda p: np.column_stack([p[:, 0], FLOOR - p[:, 2], p[:, 1]]))
+insert_worn = to_worn(insert_flat)
+
+# exact pocket for the insert (CSG, so the 0.1 mm fits are not blurred by the sculpt grid) ...
+pocket = cs_from_shapely(INNER.buffer(INS_POCKET, join_style=1)).extrude(INS_T + 0.12).translate([0, 0, -0.02])
+# ... and three short retaining tabs just in front of it (tip + both lower corners), stepped like a chamfer
+ib = np.array(INNER.exterior.coords)
+tab_at = [ib[np.argmax(ib[:, 1])], ib[np.argmin(ib[:, 0] + 0.6 * ib[:, 1])], ib[np.argmax(ib[:, 0] - 0.6 * ib[:, 1])]]
+tab_zone = CrossSection.batch_boolean([CrossSection.circle(3.5, 32).translate(list(c)) for c in tab_at], m3.OpType.Add)
+tabs = []
+w0 = INS_T + 0.1
+for off, t0, t1 in ((-TAB_IN, 0.0, 0.5), (-TAB_IN / 2, 0.5, 0.8)):
+    ring = cs_from_shapely(INNER.buffer(1.2, join_style=1)) - cs_from_shapely(INNER.buffer(off, join_style=1))
+    tabs.append((ring ^ tab_zone).extrude(t1 - t0).translate([0, 0, w0 + t0]))
+tabs = Manifold.batch_boolean(tabs, m3.OpType.Add)
+ear = ear - to_worn(pocket) + to_worn(tabs)
+print("ear pocket+tabs", ear.status(), "tabs at", np.round(tab_at, 1).tolist())
 
 # ----------------------------------------------------------------- clip (same snap design as v1)
 def clip_profile(with_hooks):
@@ -187,8 +213,33 @@ def key(gap, top, z0):
     return cs_from_shapely(Polygon([(-(5.0 - gap - z0), zz(z0)), (4.0 - gap + 0.6 * z0, zz(z0)),
                                     (4.0 - gap + 0.6 * top, zz(top)), (-(5.0 - gap - top), zz(top))]))
 rail = along_x(key(0.15, 2.95, -0.3).extrude(CLIP_L, n_divisions=40), CLIP_L) ^ plan.extrude(100).translate([0, 0, -50])
-groove = along_x(key(0.0, 3.2, -0.02).extrude(200, n_divisions=80), 200)
+GEND = CLIP_L / 2 + 0.15                     # groove is CLOSED at the ear's outer (+x) end: the rail end is the stop
+groove = along_x(key(0.0, 3.2, -0.02).extrude(100 + GEND, n_divisions=80), 100 + GEND).translate([(GEND - 100) / 2, 0, 0])
 clip = clip + rail
+
+# ---- ear click: a spring finger in the back of the ear's base (ear frame after placement) + a notch in the clip
+XA = 10.0                                   # ridge apex, x from the ear centre (outer half of the LEFT ear)
+YF, FT, FS, FG = 13.0, 2.0, 1.0, 1.0        # finger front edge y, thickness, slot above it, end/side gaps
+FX0, FX1 = -4.0, 12.0                       # finger root / free end
+RH = 0.6                                    # ridge height
+ZT = PLATE + FT + FS
+def xz_prism(pts, y0, y1):
+    """Polygon in (x, z) extruded along y from y0 to y1."""
+    return cs_from_shapely(Polygon(pts)).extrude(y1 - y0).warp_batch(lambda p: np.column_stack([p[:, 0], y1 - p[:, 2], p[:, 1]]))   # det +1
+def yz_prism(pts, x0, x1):
+    """Polygon in (y, z) extruded along x from x0 to x1."""
+    return cs_from_shapely(Polygon(pts)).extrude(x1 - x0).warp_batch(lambda p: np.column_stack([p[:, 2] + x0, p[:, 0], p[:, 1]]))
+# void around the finger; its front wall leans 45 deg so it prints without support
+f_void = yz_prism([(YF - FG - (ZT - PLATE + 1), PLATE - 1), (60, PLATE - 1), (60, ZT), (YF - FG, ZT)], FX0, FX1 + FG) -          Manifold.cube([FX1 - FX0 + 1, 60 - YF, FT + 1]).translate([FX0 - 1, YF, PLATE - 1])
+t35, t40 = np.tan(np.radians(35)), np.tan(np.radians(40))
+ridge = xz_prism([(XA - RH / t35, PLATE + 0.3), (XA - RH / t35, PLATE), (XA, PLATE - RH), (XA + RH / t40, PLATE), (XA + RH / t40, PLATE + 0.3)],
+                 YF + 0.4, 17.0)       # gentle 35 deg lead-in face toward the centre, 40 deg holding face outward
+ND = 0.75                               # notch depth; its 40 deg outer flank preloads the ridge by 0.08 mm
+XN = XA - 0.08 + (RH - ND) / t40
+def notch(xc):
+    return xz_prism([(xc - ND / t40, PLATE + 0.5), (xc - ND / t40, PLATE), (xc, PLATE - ND), (xc + ND / t40, PLATE), (xc + ND / t40, PLATE + 0.5)],
+                    YF - 0.5, YO + 1)
+clip = clip - notch(XN) - notch(-XN)        # both ends: the same printed clip serves the left and right ear
 
 
 # ----------------------------------------------------------------- assemble (clip-local frame: plate top follows the arch)
@@ -203,7 +254,8 @@ clip_b = clip.refine_to_length(3.0).warp_batch(bend)
 below = Manifold.cube([200, 80, 80]).translate([-100, -40, PLATE - 80]).refine_to_length(3.0).warp_batch(bend)
 groove_b = groove.refine_to_length(3.0).warp_batch(bend)
 # the ear itself is NOT warped (so its back stays one flat plane); only its base is cut to the arch
-earL = place_ear(ear) - below - groove_b
+bendm = lambda m, l=1.0: m.refine_to_length(l).warp_batch(bend)
+earL = place_ear(ear) - below - groove_b - bendm(f_void) + bendm(ridge, 0.5)
 earR = earL.mirror([1, 0, 0])
 clipR = clip_b.mirror([1, 0, 0])
 ins_L = place_ear(insert_worn)        # inserts sit on the (flat) cavity floor
@@ -213,7 +265,11 @@ ins_R = ins_L.mirror([1, 0, 0])
 os.makedirs(A.out, exist_ok=True)
 def tm_of(man):
     mm = man.to_mesh()
-    return trimesh.Trimesh(mm.vert_properties[:, :3], mm.tri_verts, process=True)
+    t = trimesh.Trimesh(mm.vert_properties[:, :3], mm.tri_verts, process=True)
+    parts = t.split(only_watertight=False)
+    if len(parts) > 1:      # drop zero-volume slivers left by coincident boolean faces
+        t = trimesh.util.concatenate([p for p in parts if abs(p.volume) > 0.5 or len(p.faces) > 200])
+    return t
 def unit(v):
     v = np.asarray(v, float); return v / np.linalg.norm(v)
 def ry(deg):
