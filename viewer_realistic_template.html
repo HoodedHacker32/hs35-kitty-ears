@@ -451,7 +451,9 @@ const VIEWS = {
 };
 let anim = null;
 function setView(v, instant) {
-  const [p, t] = VIEWS[v]; if (!p) return;
+  let [p, t] = VIEWS[v]; if (!p) return;
+  const k = Math.max(1, 1.15 / cam.aspect);   // tall/portrait screens: back the camera off so everything fits
+  p = t.clone().add(p.clone().sub(t).multiplyScalar(k));
   if (instant) { cam.position.copy(p); ctl.target.copy(t); ctl.update(); return; }
   anim = { p0: cam.position.clone(), t0: ctl.target.clone(), p1: p.clone(), t1: t.clone(), s: performance.now() };
 }
