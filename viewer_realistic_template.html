@@ -57,6 +57,7 @@
   <button data-view="strap">Strap fabric</button>
   <button data-view="band">Band print</button>
   <button data-view="mic">Mic</button>
+  <a href="assembly.html" style="background:#3a2a31;color:#fff;border:1px solid #f2a7c3;border-radius:999px;padding:6px 11px;font-size:12px;text-decoration:none">Assembly guide</a>
 </div>
 <script id="meta" type="application/json">__META__</script>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
@@ -418,13 +419,17 @@ new GLTFLoader().parse(bytes.buffer, '', (gl) => {
     m.applyMatrix4(o.matrixWorld); world.add(m); parts[name] = m;
   }
   // "CORSAIR" printed on the top of the band, following the real top curve
-  const pts = META.band_top_curve_xz.filter(p => Math.abs(p[0]) < 21);
-  const curve = new THREE.CatmullRomCurve3(pts.map(p => V(p[0], 0, p[1] + 0.07)));
+  const WM_ASPECT = 6.827, WM_HALF = 19;   // Corsair's own wordmark artwork, about 38 mm long on the band
+  const pts = META.band_top_curve_xz.filter(p => Math.abs(p[0]) < WM_HALF + 2).sort((a, b) => a[0] - b[0])
+    .filter((p, i, arr) => i === 0 || p[0] - arr[i - 1][0] > 0.8);   // sorted, de-duplicated: no folds
+  const curve = new THREE.CatmullRomCurve3(pts.map(p => V(p[0], 0, p[1] + 0.15)));
   const N = 80, pos = [], uv = [], idx = [];
-  for (let i = 0; i <= N; i++) { const p = curve.getPoint(i / N); for (const [j, y] of [[0, -2.6], [1, 2.6]]) { pos.push(p.x, y, p.z); uv.push(i / N, j); } }
+  const L = curve.getLength(), s0 = (L - 2 * WM_HALF) / 2;
+  for (let i = 0; i <= N; i++) { const p = curve.getPointAt((s0 + 2 * WM_HALF * i / N) / L); for (const [j, y] of [[0, -WM_HALF / WM_ASPECT], [1, WM_HALF / WM_ASPECT]]) { pos.push(p.x, y, p.z); uv.push(i / N, j); } }
   for (let i = 0; i < N; i++) idx.push(i * 2, i * 2 + 2, i * 2 + 1, i * 2 + 1, i * 2 + 2, i * 2 + 3);
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
-  const wm = M.print.clone(); wm.map = tex(wordmark('CORSAIR', 2048, 200, 150, '#8f9297', 70)); wm.map.wrapS = wm.map.wrapT = THREE.ClampToEdgeWrapping; wm.side = THREE.DoubleSide;
+  const wm = M.print.clone(); wm.color.set(0x8f9297); wm.side = THREE.DoubleSide; wm.alphaTest = 0.5;
+  wm.alphaMap = new THREE.TextureLoader().load('__WORDMARK__', tx => { tx.anisotropy = MAXANI; wm.needsUpdate = true; }); wm.alphaMap.wrapS = wm.alphaMap.wrapT = THREE.ClampToEdgeWrapping;
   const word = new THREE.Mesh(g, wm); world.add(word);
   document.getElementById('loading').remove();
   setView('overview', true);

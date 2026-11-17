@@ -1,6 +1,7 @@
 # Snap-on cat ears: Corsair HS35 v2 / HS35 Surround v2
 
 **Live 3D viewer:** https://hoodedhacker32.github.io/hs35-kitty-ears/ (works on mobile; give it a few seconds to load)
+**Animated assembly guide:** https://hoodedhacker32.github.io/hs35-kitty-ears/assembly.html
 
 Soft, rounded "hood" cat ears that snap onto the headband. Each ear has three parts, and **nothing needs supports**:
 
@@ -27,6 +28,17 @@ LEFT and RIGHT are from the wearer's point of view.
 1. Press each pink inner ear into its ear's pocket (a dab of glue if loose).
 2. Slide each ear onto a clip's dovetail rail from one end until it's centred. A small drop of superglue or epoxy on the rail makes it permanent. Optional, but recommended.
 3. Hold the ear over the headband about 50 mm out from the centre of the "CORSAIR" logo and press straight down until both hooks click under the band's edges. To remove it, flex one clip wall outward.
+
+## Cheap, fast filament (Ireland / EU)
+Any brand works on a Bambu printer (use the Generic PLA / Generic PETG profile). One order from **3DJake Ireland** covers everything, with about 4 days' delivery:
+
+| For | Material | Example (3djake.ie) | Approx. price |
+|---|---|---|---|
+| Ears | Matte black PLA | [Elegoo PLA Matte Black](https://www.3djake.ie/elegoo/pla-matte-matte-black) | €18.49 / kg |
+| Clips | Black PETG (not matte) | [SUNLU PETG Black](https://www.3djake.ie/sunlu/petg-black-10) | €14.39 / kg |
+| Inner ears | Pink PLA | [Elegoo PLA Pink](https://www.3djake.ie/elegoo/pla-pink-9) | €13.39 / kg |
+
+That's about €46 plus roughly €9.90 delivery (free over €87.90). Check the live pages: prices and stock change.
 
 ## Filament notes
 - **PETG HF is being discontinued** in most colours. Bambu relaunched **PETG Basic** in 2026 as the successor, and it's what the clips use. Avoid *matte* PETG for the clips: the matte additive makes it stiffer and more brittle, which is the opposite of what a snap clip wants.
